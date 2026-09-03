@@ -57,6 +57,8 @@ Add godot-mcp to your MCP client. See the [Installation Guide](INSTALL.md) for c
 npx @satelliteoflove/godot-mcp --install-addon /path/to/your/godot/project
 ```
 
+The installer verifies every addon file against the package manifest, then opens a throwaway copy in a headless Godot to prove the plugin compiles before you open the editor. It finds Godot on its own (`PATH`, `GODOT_BIN`, Steam, your Downloads folder); pass `--godot /path/to/godot` if it cannot, or `--skip-check` to skip the check. Run it again any time to re-verify the addon in a project and repair missing files. Details in the [Installation Guide](INSTALL.md#installing-the-addon).
+
 Enable it in Godot: **Project > Project Settings > Plugins > Godot MCP**
 
 ### 3. Start building

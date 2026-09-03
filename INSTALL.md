@@ -6,7 +6,27 @@ How to connect godot-mcp to your MCP client. If something refuses to connect aft
 
 - **Node.js 20+** - the MCP server runs on Node
 - **Godot 4.5+** - required for Logger class support
-- **godot-mcp addon installed and enabled** in your Godot project (see [Quick Start](README.md#quick-start) step 2)
+- **godot-mcp addon installed and enabled** in your Godot project (see [Installing the addon](#installing-the-addon) below)
+
+## Installing the addon
+
+```bash
+npx @satelliteoflove/godot-mcp --install-addon /path/to/your/godot/project
+```
+
+What the command does:
+
+1. Checks the package copy on your machine against its manifest (`addon/manifest.json`). A damaged copy is refused before anything is written, and the message names the `npm-cache/_npx/<hash>` folder to delete so npx downloads a clean one.
+2. Copies only the files the manifest names into `addons/godot_mcp/`, then verifies every one of them.
+3. Opens a throwaway project (in your temp folder, never your project) with the plugin enabled in a headless Godot. A pass prints the Godot version and how long the load took. A failure prints each script error with its file and line, saves the full Godot output to `godot-mcp-compile-check.log` in your temp folder, and exits with code 1.
+
+| Flag | Effect |
+|------|--------|
+| `--godot <path>` | Godot 4 executable to use for the compile check. Without it the installer looks at `GODOT_BIN`, `GODOT_PATH`, `PATH`, the Steam, Scoop, Chocolatey, Homebrew, Flatpak and Snap locations, and your Downloads folder, newest version first. |
+| `--skip-check` | Install without the compile check. |
+| `--force` | Downgrade the addon, or overwrite addon files you have edited locally. |
+
+Running the command again on a project that already has the same addon version re-verifies it: missing files are put back, stray `<file>.DELETE.<hash>` leftovers are removed, and the compile check runs again. Files you have edited yourself are left alone unless you pass `--force`.
 
 ## Generic MCP Client
 

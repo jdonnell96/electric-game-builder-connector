@@ -56,6 +56,22 @@ npx @satelliteoflove/godot-mcp --install-addon /path/to/your/godot/project
 
 Add `--force` if you intentionally need to downgrade. Restart the Godot editor afterwards.
 
+## The plugin fails to load with `Identifier "MCPResourceCommands" not declared`
+
+The addon copy in your project is missing a file. `commands/resource_commands.gd` is the usual one, and a file named `resource_commands.gd.DELETE.<hash>` sits where it should be. The editor log shows the parse error in `command_router.gd`, then `Failed to load script "res://addons/godot_mcp/plugin.gd"`.
+
+**Cause.** npm's extractor cannot replace a file in place on Windows, so it renames the old one to `<name>.DELETE.<hash>` and deletes the renamed copy. When that delete fails (antivirus, or two `npx` runs racing on the same cache entry), the leftover stays behind and the new file is never written. Installing from that package copy carried the gap into your project.
+
+**Fix.** Run the installer again:
+
+```bash
+npx @satelliteoflove/godot-mcp --install-addon /path/to/your/godot/project
+```
+
+It verifies the package copy first and refuses to install from a damaged one, naming the `npm-cache/_npx/<hash>` folder to delete. Against a project that already has the addon, it puts missing files back, removes the leftovers, and then compiles the addon in a headless Godot so you see the verdict in the terminal rather than in the editor's error log. Restart the Godot editor afterwards.
+
+If the compile check reports a different script error, its file and line are printed, and the full Godot output is saved to `godot-mcp-compile-check.log` in your temp folder. If it cannot find Godot, pass `--godot /path/to/godot`.
+
 ## Where errors show up
 
 Two different processes produce errors, and they surface in two different places:
@@ -103,7 +119,7 @@ If step 1 works but step 2 times out, the server is fine and the problem is the 
 GODOT_HOST=... GODOT_PORT=... npx -y @satelliteoflove/godot-mcp
 ```
 
-Other useful CLI flags: `--version`, `--help`.
+Other useful CLI flags: `--version`, `--help`, and for `--install-addon`: `--godot <path>`, `--skip-check`, `--force` (see the [Installation Guide](../INSTALL.md#installing-the-addon)).
 
 ## Still stuck?
 
