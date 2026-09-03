@@ -1,0 +1,33 @@
+{
+  "name": "godot_doctor",
+  "description": "Diagnose the godot-mcp setup with no game open, and name the fix for each problem: who is listening on and connected to the game debugger port 6007 (a foreign peer there makes every exec, screenshot, game_time and runtime_state call time out with no error anywhere), who holds the MCP bridge port 6550, how many editors and servers are running, whether the addon in the project is installed, complete, enabled, at the server's version, and compiles in a headless Godot, and whether export templates are installed for that Godot. Run it first whenever runtime tools time out or the connection drops. Does not need the bridge; works while disconnected.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run"
+        ],
+        "description": "run: Run every environment check and return a numbered list of findings, each with its fix"
+      },
+      "project_path": {
+        "description": "Godot project folder to inspect. Defaults to the project of the connected editor, then the running editor's --path, then the current directory.",
+        "type": "string"
+      },
+      "skip_compile_check": {
+        "description": "Skip the headless compile of the installed addon (saves about 4 seconds).",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "action"
+    ]
+  },
+  "annotations": {
+    "title": "Doctor",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  }
+}

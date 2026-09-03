@@ -170,21 +170,35 @@ export function formatCompileCheck(result: CompileCheckResult): string {
   return lines.join('\n');
 }
 
-async function pickWorkingGodot(
-  candidates: GodotCandidate[],
-): Promise<{ path: string; source: string; version: string } | undefined> {
+export interface WorkingGodot extends GodotCandidate {
+  /** `4.6.1` */
+  version: string;
+  /** What --version printed, e.g. `4.6.1.stable.official.14d19694e` */
+  fullVersion: string;
+}
+
+/** The first candidate that answers --version as a Godot 4. */
+export async function findWorkingGodot(candidates: GodotCandidate[]): Promise<WorkingGodot | undefined> {
   for (const candidate of candidates) {
-    const version = await queryVersion(candidate.path);
-    if (version && version.startsWith('4.')) return { ...candidate, version };
+    const answer = await queryVersion(candidate.path);
+    if (answer && answer.version.startsWith('4.')) return { ...candidate, ...answer };
   }
   return undefined;
 }
 
-async function queryVersion(path: string): Promise<string | undefined> {
+async function pickWorkingGodot(
+  candidates: GodotCandidate[],
+): Promise<{ path: string; source: string; version: string } | undefined> {
+  const found = await findWorkingGodot(candidates);
+  return found ? { path: found.path, source: found.source, version: found.version } : undefined;
+}
+
+async function queryVersion(path: string): Promise<{ version: string; fullVersion: string } | undefined> {
   try {
     const { stdout } = await execFileAsync(path, ['--version'], { timeout: 15_000, windowsHide: true });
-    const match = stdout.match(/(\d+\.\d+(?:\.\d+)?)/);
-    return match?.[1];
+    const line = stdout.trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
+    const match = line.match(/(\d+\.\d+(?:\.\d+)?)/);
+    return match ? { version: match[1], fullVersion: line.trim() } : undefined;
   } catch {
     return undefined;
   }

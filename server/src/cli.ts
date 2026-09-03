@@ -12,6 +12,8 @@ function parseCliArgs() {
         force: { type: 'boolean', short: 'f' },
         godot: { type: 'string' },
         'skip-check': { type: 'boolean' },
+        doctor: { type: 'boolean' },
+        json: { type: 'boolean' },
         'read-only': { type: 'boolean' },
         version: { type: 'boolean', short: 'v' },
         help: { type: 'boolean', short: 'h' },
@@ -36,6 +38,8 @@ Usage:
   godot-mcp --read-only                  Start with observation tools only
   godot-mcp --install-addon <path>       Install addon to a Godot project and
                                          verify it compiles in a headless Godot
+  godot-mcp --doctor [path]              Check ports 6007/6550, editors, servers,
+                                         the addon in a project, export templates
   godot-mcp --version                    Show version
   godot-mcp --help                       Show this help
 
@@ -45,7 +49,11 @@ Options:
                          overwrite locally modified addon files
       --godot <path>     Godot 4 executable for the compile check (otherwise
                          GODOT_BIN, PATH and common install folders are searched)
-      --skip-check       Install without running the compile check
+      --skip-check       Install (or doctor) without the compile check
+      --doctor [path]    Diagnose this machine; the project defaults to the one
+                         the running editor has open, then the current folder.
+                         Exit code 1 when anything fails.
+      --json             With --doctor: print the report as JSON
       --read-only        Register only read-only tools (no scene/node/animation
                          edits, no game control, no input injection, no exec).
                          GODOT_MCP_READ_ONLY=1 does the same.
@@ -58,6 +66,17 @@ Options:
 if (values.version) {
   console.log(getServerVersion());
   process.exit(0);
+}
+
+if (values.doctor) {
+  const { runDoctor, formatDoctorReport } = await import('./doctor/run.js');
+  const report = await runDoctor({
+    projectPath: positionals[0],
+    godot: values.godot,
+    skipCompileCheck: values['skip-check'],
+  });
+  console.log(values.json ? JSON.stringify(report, null, 2) : formatDoctorReport(report));
+  process.exit(report.exitCode);
 }
 
 if (values['install-addon']) {

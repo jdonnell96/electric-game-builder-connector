@@ -10,7 +10,8 @@ import { initializeConnection, getGodotConnection } from './connection/websocket
 import { registry } from './core/registry.js';
 import { isStructuredResult } from './core/structured.js';
 import { registerAllTools } from './tools/index.js';
-import { GodotCommandError } from './utils/errors.js';
+import { GodotCommandError, GodotTimeoutError } from './utils/errors.js';
+import { timeoutHint } from './doctor/run.js';
 import { logger } from './utils/logger.js';
 import { getServerVersion } from './version.js';
 import { checkBuildFreshness } from './utils/build-info.js';
@@ -130,6 +131,10 @@ export async function main(deps: MainDeps = {}) {
       let message: string;
       if (error instanceof GodotCommandError) {
         message = `[${error.code}] ${error.message}`;
+      } else if (error instanceof GodotTimeoutError) {
+        // A silent timeout is the signature of a foreign peer on the debugger
+        // port; say so by PID instead of leaving the model to guess.
+        message = `${error.message}${await timeoutHint()}`;
       } else if (error instanceof Error) {
         message = error.message;
       } else {
