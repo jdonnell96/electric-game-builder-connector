@@ -132,7 +132,7 @@ Or add to your Copilot CLI settings file (`~/.config/github-copilot/mcp.json`):
 | `GODOT_MCP_USAGE_LOG` | on | Local usage telemetry: each tool call appends a JSON line (tool, action, success, duration) to `~/.godot-mcp/usage.log`. **Enabled by default** — set to `0` or `false` to disable. The log never leaves your machine. |
 | `GODOT_MCP_USAGE_LOG_MAX_SIZE` | `10485760` (10MB) | Size in bytes at which `usage.log` is rotated. |
 | `GODOT_MCP_VERBOSE` | off | Set to `1` to surface info/debug logs on stderr. Warnings and errors always print. |
-| `GODOT_MCP_READ_ONLY` | off | Set to `1` to register only the 12 observation tools — the agent can look but not touch. Same as `--read-only`. |
+| `GODOT_MCP_READ_ONLY` | off | Set to `1` to register only the 13 observation tools — the agent can look but not touch. Same as `--read-only`. |
 
 Example with environment variables:
 
@@ -142,7 +142,7 @@ GODOT_HOST=192.168.1.100 GODOT_PORT=7000 npx -y @satelliteoflove/godot-mcp
 
 ### Read-only mode
 
-Start the server with `--read-only` (or `GODOT_MCP_READ_ONLY=1`) to register only the 12 observation tools — no scene, node, animation, tilemap, or gridmap edits, no input injection, no running the game. Useful for agents that should inspect a project without being able to modify it:
+Start the server with `--read-only` (or `GODOT_MCP_READ_ONLY=1`) to register only the 13 observation tools — no scene, node, animation, tilemap, or gridmap edits, no input injection, no running the game. Useful for agents that should inspect a project without being able to modify it:
 
 ```bash
 npx -y @satelliteoflove/godot-mcp --read-only

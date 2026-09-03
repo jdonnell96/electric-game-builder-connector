@@ -67,7 +67,7 @@ Open your Godot project, restart your AI assistant, and start building. If anyth
 
 ## What's in the box
 
-21 tools, 86 actions. Full API docs in the [Tools Reference](docs/tools/README.md).
+22 tools, 87 actions. Full API docs in the [Tools Reference](docs/tools/README.md).
 
 | Tool | What it does |
 |------|--------------|
@@ -87,6 +87,7 @@ Open your Godot project, restart your AI assistant, and start building. If anyth
 | `godot_game_time` | Freeze, step, and step-until on the game clock — deterministic observation |
 | `godot_exec` | Run GDScript inside the running game for test scenario setup |
 | `godot_validate_meshes` | Detect silently corrupt procedural mesh data that masquerades as lighting bugs |
+| `godot_doctor` | Diagnose the setup with no game open: who is on ports 6007 and 6550, editors and servers, addon install and compile status, export templates; every finding names its fix |
 
 A note on shape: tools split along the read/write boundary, so every `godot_*_read` tool (and the other read-only tools) can be safely auto-allowed in your client's permission settings while writes stay gated. Related operations still live as actions inside one tool, so your agent's context isn't flooded with definitions it won't use. Anything an agent can do by editing project files directly — creating scenes and nodes, attaching scripts, connecting signals — is deliberately *not* duplicated as a tool; the bridge covers what files can't: editor state, verification, binary-encoded cell data, and the running game. A `--read-only` flag serves the look-but-don't-touch use case.
 

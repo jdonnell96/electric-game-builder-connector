@@ -2,6 +2,14 @@
 
 Connection problems, common fixes, and how to verify each link in the chain.
 
+## The 10-second version: run the doctor
+
+```bash
+npx @satelliteoflove/godot-mcp --doctor
+```
+
+It checks everything in this guide with no game open and prints a numbered list of what is wrong, each item with the command or click that fixes it: who is listening on and connected to the game debugger port 6007 (a foreign peer there is why runtime tools time out with no error anywhere), who holds the bridge port 6550, how many editors and servers are running, whether the addon in the project is installed, complete, enabled, at the server's version and compiles, and whether export templates are present. It finds the project from the running editor; pass a path to check another one. Inside an MCP session the same report is the `godot_doctor` tool. Exit code 1 means something failed.
+
 ## The 60-second checklist
 
 Most "it doesn't work" reports come down to one of these:
