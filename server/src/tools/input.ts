@@ -263,7 +263,7 @@ const InputSchema = z.discriminatedUnion('action', [
         'never decays; cost scales with resolution (~1 visual token per 28x28px patch), independent ' +
         'of format. Use multi-frame ONLY for transient/animated visuals — a static layout needs ' +
         'exactly ONE frame. Prefer a few frames at a modest screenshot_max_width over many large ' +
-        'ones; for frozen/precise inspection use godot_game_time step + screenshot_game instead.'
+        'ones; for frozen/precise inspection use godot_game_time step + screenshot instead.'
       ),
     screenshot_max_width: z
       .number()

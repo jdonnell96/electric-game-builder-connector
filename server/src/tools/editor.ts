@@ -3,6 +3,8 @@ import { defineTool } from '../core/define-tool.js';
 import { structured } from '../core/structured.js';
 import { staleAdvisory, type ProjectStaleness } from '../utils/project-staleness.js';
 import type { AnyToolDefinition, ImageContent, Vector3 } from '../core/types.js';
+import { GodotCommandError } from '../utils/errors.js';
+import { timeoutHint } from '../doctor/run.js';
 
 interface ScreenshotResponse {
   image_base64: string;
@@ -36,6 +38,35 @@ function toImageContent(base64: string): ImageContent {
     data: base64,
     mimeType: 'image/png',
   };
+}
+
+const SCREENSHOT_COST_NOTE =
+  'Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable.';
+
+// A screenshot that cannot be taken must say why in terms the caller can act
+// on. The addon's codes are terse; each maps to the situation behind it, and a
+// timeout carries the port-6007 diagnosis because that is what it usually is.
+async function explainScreenshotFailure(error: unknown): Promise<unknown> {
+  if (!(error instanceof GodotCommandError)) return error;
+  switch (error.code) {
+    case 'NOT_RUNNING':
+      return new GodotCommandError(
+        error.code,
+        'No game is running, so there is no frame to capture. Start it with godot_editor_edit run (frozen: true for a deterministic first frame), then call screenshot.',
+      );
+    case 'NO_SESSION':
+      return new GodotCommandError(
+        error.code,
+        'A game is running but the editor has no debug session with it, so its framebuffer cannot be read. Either the MCPGameBridge autoload is missing from project.godot (open the project once with the plugin enabled, or run godot_doctor), or the game was not launched from this editor.',
+      );
+    case 'TIMEOUT':
+      return new GodotCommandError(
+        error.code,
+        `The running game did not answer the screenshot request in time. ${error.message}${await timeoutHint()}`,
+      );
+    default:
+      return error;
+  }
 }
 
 interface LogMessage {
@@ -86,32 +117,24 @@ const EditorReadSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('get_stack_trace').describe('Get the most recent error stack trace') }),
   z.object({
     action: z
-      .literal('screenshot_game')
+      .literal('screenshot')
       .describe(
-        'Capture a lossless PNG of the running game. Each frame persists in context every later turn and never decays, so reserve it for genuine APPEARANCE judgments (spacing, color, art, "does it look right"). For STRUCTURE or state — which control is focused, a label\'s text, whether a panel is visible, a node\'s anchors/size — read cheap text instead: godot_node_read (scene tree, node properties) or godot_runtime_state digest (live values), both ~free versus the hundreds of visual tokens a frame costs. Do not re-shoot a view that has not changed.'
+        'Capture a lossless PNG of the RUNNING GAME\'s framebuffer, the frame the player would see right now, or fail with the reason (no game running, no debug session, debugger channel blocked). Never an editor viewport. Each frame persists in context every later turn and never decays, so reserve it for genuine APPEARANCE judgments (spacing, color, art, "does it look right"). For STRUCTURE or state — which control is focused, a label\'s text, whether a panel is visible, a node\'s anchors/size — read cheap text instead: godot_node_read (scene tree, node properties) or godot_runtime_state digest (live values), both ~free versus the hundreds of visual tokens a frame costs. Do not re-shoot a view that has not changed.'
       ),
-    max_width: z
-      .number()
-      .int()
-      .optional()
-      .describe(
-        'Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable.'
-      ),
+    max_width: z.number().int().optional().describe(SCREENSHOT_COST_NOTE),
+  }),
+  z.object({
+    action: z.literal('screenshot_game').describe('Older name for screenshot; identical.'),
+    max_width: z.number().int().optional().describe(SCREENSHOT_COST_NOTE),
   }),
   z.object({
     action: z
-      .literal('screenshot_editor')
+      .literal('capture_editor_viewport')
       .describe(
-        'Capture a lossless PNG of an editor viewport. Same context cost as screenshot_game — the frame persists every later turn — so capture for appearance, not for structure/state you could read as cheap text via godot_node_read (scene tree, node properties) or godot_runtime_state.'
+        'NOT the running game. A render of the editor\'s design-time 2D or 3D canvas, redrawn on request: the scene as it sits in the editor, with editor gizmos and grid, without runtime state, spawned nodes, animation, or the game camera. Use it only to check editor-side layout; to see what a player sees, run the game and call screenshot. Same context cost as screenshot, so prefer godot_node_read for structure.'
       ),
-    viewport: z.enum(['2d', '3d']).optional().describe('Which editor viewport to capture'),
-    max_width: z
-      .number()
-      .int()
-      .optional()
-      .describe(
-        'Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens). 640 is the legibility floor for chip-dense UI (512 is the edge, 384 breaks fine print), so drop toward 640 to roughly halve per-frame cost when you do not need the finest text; raise above 900 only when detail is unreadable.'
-      ),
+    viewport: z.enum(['2d', '3d']).optional().describe('Which editor canvas to render (default: whichever main-screen tab is active)'),
+    max_width: z.number().int().optional().describe(SCREENSHOT_COST_NOTE),
   }),
 ]);
 
@@ -180,7 +203,7 @@ export const editorRead = defineTool({
   name: 'godot_editor_read',
   annotations: { title: 'Editor Control (read)', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   description:
-    'Observe the editor and running game: get editor state (open scene, play state, camera, viewport), read the current node selection, pull editor log messages (with an incremental cursor) and stack traces, and capture lossless PNG screenshots of the running game or an editor viewport. Reach for it to check what the editor sees before and after a change; screenshot_game needs a running game, while every other action works in the bare editor. It changes nothing - to select nodes, run/stop/restart, or move the 2D viewport use godot_editor_edit; errors from the running game (not the editor process) come via minimal-godot-mcp\'s get_console_output when that companion server is installed.',
+    'Observe the editor and running game: get editor state (open scene, play state, camera, viewport), read the current node selection, pull editor log messages (with an incremental cursor) and stack traces, and capture a lossless PNG of the running game (screenshot: the real framebuffer, or an error that says why) or of the editor\'s design-time canvas (capture_editor_viewport, clearly labelled, never a game frame). Reach for it to check what the editor sees before and after a change; screenshot needs a running game, while every other action works in the bare editor. It changes nothing - to select nodes, run/stop/restart, or move the 2D viewport use godot_editor_edit; errors from the running game (not the editor process) come via minimal-godot-mcp\'s get_console_output when that companion server is installed.',
   schema: EditorReadSchema,
   async execute(args: EditorReadArgs, { godot }) {
     switch (args.action) {
@@ -249,11 +272,14 @@ export const editorRead = defineTool({
         return structured(result);
       }
 
+      case 'screenshot':
       case 'screenshot_game': {
-        const result = await godot.sendCommand<ScreenshotResponse>(
-          'capture_game_screenshot',
-          { max_width: args.max_width }
-        );
+        let result: ScreenshotResponse;
+        try {
+          result = await godot.sendCommand<ScreenshotResponse>('capture_game_screenshot', { max_width: args.max_width });
+        } catch (error) {
+          throw await explainScreenshotFailure(error);
+        }
         const image = toImageContent(result.image_base64);
         // Mesh-integrity advisory: corrupt procedural meshes render as "too
         // dark / invisible" with NO error anywhere, so an agent's first
@@ -276,12 +302,22 @@ export const editorRead = defineTool({
         return image;
       }
 
-      case 'screenshot_editor': {
-        const result = await godot.sendCommand<ScreenshotResponse>(
+      case 'capture_editor_viewport': {
+        const result = await godot.sendCommand<ScreenshotResponse & { viewport?: string; scene?: string }>(
           'capture_editor_screenshot',
           { viewport: args.viewport, max_width: args.max_width }
         );
-        return toImageContent(result.image_base64);
+        // The label travels with the image so it can never be mistaken for a
+        // game frame later in the context, where only the picture remains.
+        const which = result.viewport ?? args.viewport ?? 'active';
+        const scene = result.scene ? ` of ${result.scene}` : '';
+        return [
+          {
+            type: 'text',
+            text: `Editor design view (${which} canvas${scene}), NOT the running game: editor gizmos are drawn, runtime state and spawned nodes are absent. For what a player sees, run the game and call screenshot.`,
+          },
+          toImageContent(result.image_base64),
+        ];
       }
     }
   },

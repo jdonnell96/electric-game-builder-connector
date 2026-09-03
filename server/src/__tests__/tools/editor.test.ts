@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMockGodot, createToolContext, MockGodotConnection, structuredOf } from '../helpers/mock-godot.js';
 import { editorRead, editorEdit } from '../../tools/editor.js';
+import { GodotCommandError } from '../../utils/errors.js';
 
 describe('editorRead tool', () => {
   let mock: MockGodotConnection;
@@ -19,6 +20,8 @@ describe('editorRead tool', () => {
     it('accepts its own read actions', () => {
       expect(editorRead.schema.safeParse({ action: 'get_state' }).success).toBe(true);
       expect(editorRead.schema.safeParse({ action: 'screenshot_game' }).success).toBe(true);
+      expect(editorRead.schema.safeParse({ action: 'screenshot' }).success).toBe(true);
+      expect(editorRead.schema.safeParse({ action: 'capture_editor_viewport', viewport: '3d' }).success).toBe(true);
     });
   });
 
@@ -228,13 +231,29 @@ describe('editorRead tool', () => {
       expect(result).toEqual({ type: 'image', data: 'abc', mimeType: 'image/png' });
     });
 
-    it('passes viewport and max_width params for editor screenshot', async () => {
-      mock.mockResponse({ image_base64: 'abc', width: 800, height: 600 });
+    it('accepts screenshot as the primary name and keeps screenshot_game as an alias', async () => {
+      mock.mockResponse({ image_base64: 'abc', width: 8, height: 8 });
+      const ctx = createToolContext(mock);
+      const result = await editorRead.execute({ action: 'screenshot', max_width: 640 }, ctx);
+      expect(result).toEqual({ type: 'image', data: 'abc', mimeType: 'image/png' });
+      expect(mock.calls[0].command).toBe('capture_game_screenshot');
+      expect(mock.calls[0].params.max_width).toBe(640);
+      expect(editorRead.schema.safeParse({ action: 'screenshot_editor' }).success).toBe(false);
+    });
+
+    it('labels the editor canvas capture so it is never mistaken for a game frame', async () => {
+      mock.mockResponse({ image_base64: 'abc', width: 800, height: 600, viewport: '2d', scene: 'res://scenes/game.tscn' });
       const ctx = createToolContext(mock);
 
-      await editorRead.execute({ action: 'screenshot_editor', viewport: '2d', max_width: 800 }, ctx);
+      const result = await editorRead.execute({ action: 'capture_editor_viewport', viewport: '2d', max_width: 800 }, ctx);
+      expect(mock.calls[0].command).toBe('capture_editor_screenshot');
       expect(mock.calls[0].params.viewport).toBe('2d');
       expect(mock.calls[0].params.max_width).toBe(800);
+      const blocks = result as Array<{ type: string; text?: string; data?: string }>;
+      expect(blocks[0].type).toBe('text');
+      expect(blocks[0].text).toContain('NOT the running game');
+      expect(blocks[0].text).toContain('2d canvas of res://scenes/game.tscn');
+      expect(blocks[1]).toEqual({ type: 'image', data: 'abc', mimeType: 'image/png' });
     });
 
     it('propagates errors from Godot', async () => {
@@ -243,6 +262,14 @@ describe('editorRead tool', () => {
 
       await expect(editorRead.execute({ action: 'screenshot_game' }, ctx))
         .rejects.toThrow('Game is not running');
+    });
+
+    it('explains NOT_RUNNING and NO_SESSION in terms the caller can act on', async () => {
+      const ctx = createToolContext(mock);
+      mock.mockError(new GodotCommandError('NOT_RUNNING', 'No game is currently running. Use run_project first.'));
+      await expect(editorRead.execute({ action: 'screenshot' }, ctx)).rejects.toThrow('godot_editor_edit run');
+      mock.mockError(new GodotCommandError('NO_SESSION', 'No active debug session.'));
+      await expect(editorRead.execute({ action: 'screenshot' }, ctx)).rejects.toThrow('MCPGameBridge');
     });
   });
 });

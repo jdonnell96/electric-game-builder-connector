@@ -274,7 +274,7 @@ const RuntimeStateSchema = z.discriminatedUnion('action', [
       .literal('digest')
       .describe(
         'Snapshot current game entity state as structured JSON — exact positions, velocities, ' +
-        'animation state, and custom game data. Much cheaper than screenshot_game (no vision tokens). ' +
+        'animation state, and custom game data. Much cheaper than screenshot (no vision tokens). ' +
         'Works on any game with no setup; add nodes to the "mcp_watch" group or implement ' +
         '`func _mcp_state() -> Dictionary` on key nodes for richer, targeted data. ' +
         'WHAT TO PUT IN _mcp_state(): include BOTH (1) live runtime values that change during ' +
@@ -437,7 +437,7 @@ export const runtimeState = defineTool({
   },
   description:
     'Observe live game state as structured data. ' +
-    'Use digest for a one-shot entity snapshot (replaces most godot_editor_read screenshot_game calls). ' +
+    'Use digest for a one-shot entity snapshot (replaces most godot_editor_read screenshot calls). ' +
     'Use watch_start → watch_collect for state-over-time without context blowup. ' +
     'Navigation (NavigationAgent path state, NavigationServer map sync, find-path) is not ' +
     'exposed here; use godot_exec with the recipe in docs/runtime-state-guide.md ' +

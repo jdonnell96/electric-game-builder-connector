@@ -3,7 +3,10 @@ extends MCPBaseCommand
 class_name MCPScreenshotCommands
 
 const DEFAULT_MAX_WIDTH := 900
-const SCREENSHOT_TIMEOUT := 5.0
+# A healthy round trip over the debugger channel is well under a second; a
+# longer wait means the channel is blocked (a foreign peer on port 6007), and
+# the caller is better served by a fast, explicit error than by waiting.
+const SCREENSHOT_TIMEOUT := 3.0
 
 var _screenshot_result: Dictionary = {}
 var _screenshot_pending: bool = false
@@ -42,7 +45,7 @@ func capture_game_screenshot(params: Dictionary) -> Dictionary:
 			_screenshot_pending = false
 			if debugger_plugin.screenshot_received.is_connected(_on_screenshot_received):
 				debugger_plugin.screenshot_received.disconnect(_on_screenshot_received)
-			return _error("TIMEOUT", "Screenshot request timed out")
+			return _error("TIMEOUT", "The running game did not answer within %.0fs over the debugger channel (port 6007)." % SCREENSHOT_TIMEOUT)
 
 	return _screenshot_result
 
@@ -71,6 +74,7 @@ func capture_editor_screenshot(params: Dictionary) -> Dictionary:
 	var max_width: int = params.get("max_width", DEFAULT_MAX_WIDTH)
 
 	var viewport: SubViewport = null
+	var resolved := viewport_type
 
 	match viewport_type:
 		"2d":
@@ -79,17 +83,28 @@ func capture_editor_screenshot(params: Dictionary) -> Dictionary:
 			viewport = EditorInterface.get_editor_viewport_3d(0)
 		_:
 			viewport = _find_active_viewport()
+			resolved = "3d" if viewport != null and viewport == EditorInterface.get_editor_viewport_3d(0) else "2d"
 
 	if viewport == null:
 		return _error("NO_VIEWPORT", "Could not find editor viewport")
 
+	# The editor redraws a canvas only when something on it changes, and not at
+	# all while its tab is hidden, so the texture can predate the last edit.
+	# Force one draw, wait for it, then hand the viewport its own mode back.
+	var previous_mode := viewport.render_target_update_mode
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	await RenderingServer.frame_post_draw
+	viewport.render_target_update_mode = previous_mode
+
 	var image := viewport.get_texture().get_image()
-	return _process_and_encode_image(image, max_width)
+	var root := EditorInterface.get_edited_scene_root()
+	var scene_path := root.scene_file_path if root != null else ""
+	return _process_and_encode_image(image, max_width, {"viewport": resolved, "scene": scene_path})
 
 
 # Lossless PNG, not JPEG: vision-token cost is set by resolution, not codec, so
 # JPEG only added compression artifacts. max_width bounds the resolution cost.
-func _process_and_encode_image(image: Image, max_width: int) -> Dictionary:
+func _process_and_encode_image(image: Image, max_width: int, extra: Dictionary = {}) -> Dictionary:
 	if image == null:
 		return _error("CAPTURE_FAILED", "Failed to capture image from viewport")
 
@@ -101,11 +116,13 @@ func _process_and_encode_image(image: Image, max_width: int) -> Dictionary:
 	var png_buffer := image.save_png_to_buffer()
 	var base64 := Marshalls.raw_to_base64(png_buffer)
 
-	return _success({
+	var payload := {
 		"image_base64": base64,
 		"width": image.get_width(),
 		"height": image.get_height()
-	})
+	}
+	payload.merge(extra)
+	return _success(payload)
 
 
 # Returns the SubViewport of whichever main-screen tab (2D or 3D) is currently
