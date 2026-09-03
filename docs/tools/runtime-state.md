@@ -10,13 +10,13 @@ Observe live game entity state as structured JSON — positions, velocities, ani
 
 ## godot_runtime_state
 
-Observe live game state as structured data. Use digest for a one-shot entity snapshot (replaces most godot_editor_read screenshot_game calls). Use watch_start → watch_collect for state-over-time without context blowup. Navigation (NavigationAgent path state, NavigationServer map sync, find-path) is not exposed here; use godot_exec with the recipe in docs/runtime-state-guide.md "Reading navigation state".
+Observe live game state as structured data. Use digest for a one-shot entity snapshot (replaces most godot_editor_read screenshot calls). Use watch_start → watch_collect for state-over-time without context blowup. Navigation (NavigationAgent path state, NavigationServer map sync, find-path) is not exposed here; use godot_exec with the recipe in docs/runtime-state-guide.md "Reading navigation state".
 
 ### Actions
 
 #### `digest`
 
-Snapshot current game entity state as structured JSON — exact positions, velocities, animation state, and custom game data. Much cheaper than screenshot_game (no vision tokens). Works on any game with no setup; add nodes to the "mcp_watch" group or implement `func _mcp_state() -> Dictionary` on key nodes for richer, targeted data. WHAT TO PUT IN _mcp_state(): include BOTH (1) live runtime values that change during play (cursor position, health, score, fill counts) AND (2) static definition context an agent needs to interpret them — e.g. a puzzle node should expose its clue data, a level node its objective list, a shop its item catalog. Without definition context, an agent can observe state changes but cannot verify correctness. Also include layout geometry for renderable nodes (bounds, sizes, offsets) to enable programmatic layout checks without a screenshot.
+Snapshot current game entity state as structured JSON — exact positions, velocities, animation state, and custom game data. Much cheaper than screenshot (no vision tokens). Works on any game with no setup; add nodes to the "mcp_watch" group or implement `func _mcp_state() -> Dictionary` on key nodes for richer, targeted data. WHAT TO PUT IN _mcp_state(): include BOTH (1) live runtime values that change during play (cursor position, health, score, fill counts) AND (2) static definition context an agent needs to interpret them — e.g. a puzzle node should expose its clue data, a level node its objective list, a shop its item catalog. Without definition context, an agent can observe state changes but cannot verify correctness. Also include layout geometry for renderable nodes (bounds, sizes, offsets) to enable programmatic layout checks without a screenshot.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|

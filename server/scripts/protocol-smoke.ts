@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     outputSchema?: unknown;
     annotations?: { title?: string; readOnlyHint?: boolean };
   }>;
-  check('tools/list returns 22 tools', tools.length === 22, `got ${tools.length}`);
+  check('tools/list returns 23 tools', tools.length === 23, `got ${tools.length}`);
   check(
     'every inputSchema is a flat object (no oneOf/anyOf/allOf at root)',
     tools.every((t) => t.inputSchema.type === 'object' && !t.inputSchema.oneOf && !t.inputSchema.anyOf && !t.inputSchema.allOf)

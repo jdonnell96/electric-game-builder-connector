@@ -11,7 +11,7 @@ Editor control, debugging, and screenshot tools
 
 ## godot_editor_read
 
-Observe the editor and running game: get editor state (open scene, play state, camera, viewport), read the current node selection, pull editor log messages (with an incremental cursor) and stack traces, and capture lossless PNG screenshots of the running game or an editor viewport. Reach for it to check what the editor sees before and after a change; screenshot_game needs a running game, while every other action works in the bare editor. It changes nothing - to select nodes, run/stop/restart, or move the 2D viewport use godot_editor_edit; errors from the running game (not the editor process) come via minimal-godot-mcp's get_console_output when that companion server is installed.
+Observe the editor and running game: get editor state (open scene, play state, camera, viewport), read the current node selection, pull editor log messages (with an incremental cursor) and stack traces, and capture a lossless PNG of the running game (screenshot: the real framebuffer, or an error that says why) or of the editor's design-time canvas (capture_editor_viewport, clearly labelled, never a game frame). Reach for it to check what the editor sees before and after a change; screenshot needs a running game, while every other action works in the bare editor. It changes nothing - to select nodes, run/stop/restart, or move the 2D viewport use godot_editor_edit; errors from the running game (not the editor process) come via minimal-godot-mcp's get_console_output when that companion server is installed.
 
 ### Actions
 
@@ -44,22 +44,30 @@ Get the most recent error stack trace
 
 *No parameters.*
 
-#### `screenshot_game`
+#### `screenshot`
 
-Capture a lossless PNG of the running game. Each frame persists in context every later turn and never decays, so reserve it for genuine APPEARANCE judgments (spacing, color, art, "does it look right"). For STRUCTURE or state — which control is focused, a label's text, whether a panel is visible, a node's anchors/size — read cheap text instead: godot_node_read (scene tree, node properties) or godot_runtime_state digest (live values), both ~free versus the hundreds of visual tokens a frame costs. Do not re-shoot a view that has not changed.
+Capture a lossless PNG of the RUNNING GAME's framebuffer, the frame the player would see right now, or fail with the reason (no game running, no debug session, debugger channel blocked). Never an editor viewport. Each frame persists in context every later turn and never decays, so reserve it for genuine APPEARANCE judgments (spacing, color, art, "does it look right"). For STRUCTURE or state — which control is focused, a label's text, whether a panel is visible, a node's anchors/size — read cheap text instead: godot_node_read (scene tree, node properties) or godot_runtime_state digest (live values), both ~free versus the hundreds of visual tokens a frame costs. Do not re-shoot a view that has not changed.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `max_width` | integer | No | Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable. |
 
-#### `screenshot_editor`
+#### `screenshot_game`
 
-Capture a lossless PNG of an editor viewport. Same context cost as screenshot_game — the frame persists every later turn — so capture for appearance, not for structure/state you could read as cheap text via godot_node_read (scene tree, node properties) or godot_runtime_state.
+Older name for screenshot; identical.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `viewport` | `2d`, `3d` | No | Which editor viewport to capture |
-| `max_width` | integer | No | Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens). 640 is the legibility floor for chip-dense UI (512 is the edge, 384 breaks fine print), so drop toward 640 to roughly halve per-frame cost when you do not need the finest text; raise above 900 only when detail is unreadable. |
+| `max_width` | integer | No | Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable. |
+
+#### `capture_editor_viewport`
+
+NOT the running game. A render of the editor's design-time 2D or 3D canvas, redrawn on request: the scene as it sits in the editor, with editor gizmos and grid, without runtime state, spawned nodes, animation, or the game camera. Use it only to check editor-side layout; to see what a player sees, run the game and call screenshot. Same context cost as screenshot, so prefer godot_node_read for structure.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `viewport` | `2d`, `3d` | No | Which editor canvas to render (default: whichever main-screen tab is active) |
+| `max_width` | integer | No | Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable. |
 
 ### Examples
 
@@ -84,7 +92,7 @@ Capture a lossless PNG of an editor viewport. Same context cost as screenshot_ga
 }
 ```
 
-*3 more actions available: `get_stack_trace`, `screenshot_game`, `screenshot_editor`*
+*4 more actions available: `get_stack_trace`, `screenshot`, `screenshot_game`, `capture_editor_viewport`*
 
 ---
 

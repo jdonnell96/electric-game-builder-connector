@@ -13,6 +13,7 @@ function parseCliArgs() {
         godot: { type: 'string' },
         'skip-check': { type: 'boolean' },
         doctor: { type: 'boolean' },
+        'run-tests': { type: 'string' },
         json: { type: 'boolean' },
         'read-only': { type: 'boolean' },
         version: { type: 'boolean', short: 'v' },
@@ -40,6 +41,9 @@ Usage:
                                          verify it compiles in a headless Godot
   godot-mcp --doctor [path]              Check ports 6007/6550, editors, servers,
                                          the addon in a project, export templates
+  godot-mcp --run-tests <res://scene> [path] [-- args...]
+                                         Run a test scene headlessly and report
+                                         every PASS/FAIL check; exit 1 on failure
   godot-mcp --version                    Show version
   godot-mcp --help                       Show this help
 
@@ -53,7 +57,12 @@ Options:
       --doctor [path]    Diagnose this machine; the project defaults to the one
                          the running editor has open, then the current folder.
                          Exit code 1 when anything fails.
-      --json             With --doctor: print the report as JSON
+      --json             With --doctor or --run-tests: print the report as JSON
+      --run-tests <res://path>
+                         Test scene (.tscn) or script (.gd) to run in a headless
+                         Godot. The project is the next positional argument, or
+                         the current folder. Arguments after -- go to the test
+                         (e.g. -- --test-save).
       --read-only        Register only read-only tools (no scene/node/animation
                          edits, no game control, no input injection, no exec).
                          GODOT_MCP_READ_ONLY=1 does the same.
@@ -77,6 +86,23 @@ if (values.doctor) {
   });
   console.log(values.json ? JSON.stringify(report, null, 2) : formatDoctorReport(report));
   process.exit(report.exitCode);
+}
+
+if (values['run-tests']) {
+  const { runTests, formatTestRunResult } = await import('./testing/run-tests.js');
+  const { existsSync } = await import('node:fs');
+  // First positional is the project when it is a folder; everything else goes to the test.
+  const [first, ...rest] = positionals;
+  const projectPath = first && existsSync(first) ? first : process.cwd();
+  const testArgs = first && existsSync(first) ? rest : positionals;
+  try {
+    const result = await runTests({ projectPath, target: values['run-tests'], args: testArgs, godot: values.godot });
+    console.log(values.json ? JSON.stringify(result, null, 2) : formatTestRunResult(result));
+    process.exit(result.ok ? 0 : 1);
+  } catch (error) {
+    console.error('Error:', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }
 
 if (values['install-addon']) {

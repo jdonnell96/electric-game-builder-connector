@@ -15,6 +15,7 @@ import { gameTimeTools } from './game-time.js';
 import { execTools } from './exec.js';
 import { validateMeshesTools } from './validate-meshes.js';
 import { doctorTools } from './doctor.js';
+import { runTestsTools } from './run-tests.js';
 
 export interface RegisterOptions {
   // Register only tools whose annotations declare readOnlyHint: true — a real
@@ -40,6 +41,7 @@ export function registerAllTools(options: RegisterOptions = {}): void {
     ...execTools,
     ...validateMeshesTools,
     ...doctorTools,
+    ...runTestsTools,
   ];
   const tools = options.readOnly
     ? all.filter((tool) => tool.annotations?.readOnlyHint === true)
@@ -63,3 +65,4 @@ export { gameTimeTools } from './game-time.js';
 export { execTools } from './exec.js';
 export { validateMeshesTools } from './validate-meshes.js';
 export { doctorTools } from './doctor.js';
+export { runTestsTools } from './run-tests.js';

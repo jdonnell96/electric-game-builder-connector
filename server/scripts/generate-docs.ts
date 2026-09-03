@@ -20,6 +20,7 @@ import { gameTimeTools } from '../src/tools/game-time.js';
 import { execTools } from '../src/tools/exec.js';
 import { validateMeshesTools } from '../src/tools/validate-meshes.js';
 import { doctorTools } from '../src/tools/doctor.js';
+import { runTestsTools } from '../src/tools/run-tests.js';
 import { toInputSchema } from '../src/core/schema.js';
 import {
   getActionVariants,
@@ -59,6 +60,7 @@ const categories: ToolCategory[] = [
   { name: 'Game Script Execution', filename: 'exec', description: 'Run GDScript inside the running game for test scenario setup: one-shot state mutations plus persistent holder-managed nodes, behind a denylist accident guard.', tools: execTools },
   { name: 'Mesh Validation', filename: 'validate-meshes', description: 'Detect silently corrupt procedurally generated mesh data (inside-out winding, dropped triangles, degenerate UVs, NaN normals/tangents) that renders without errors and masquerades as lighting problems. Findings carry their likely cause and fix; a cheap scene-load sniff also attaches one-line warnings to game screenshots.', tools: validateMeshesTools },
   { name: 'Doctor', filename: 'doctor', description: 'Environment diagnosis with no game open: who is on the game debugger port 6007 and the bridge port 6550, running editors and servers, whether the addon in the project is installed, complete, enabled, version-matched and compiles, and whether export templates are present. Every finding names its fix.', tools: doctorTools },
+  { name: 'Run Tests', filename: 'run-tests', description: 'Prove the game works: run a headless test scene in a separate Godot process and get back every PASS/FAIL check, script errors, and the exit code. The harness protocol is a printed "PASS  <label>" or "FAIL  <label>  <detail>" per check plus a non-zero exit on failure.', tools: runTestsTools },
 ];
 
 function ensureDir(dir: string): void {

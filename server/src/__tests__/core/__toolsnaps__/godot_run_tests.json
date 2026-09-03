@@ -1,0 +1,51 @@
+{
+  "name": "godot_run_tests",
+  "description": "Prove the game works before showing it: run a headless test scene in a separate Godot process and get back structured results: passed/failed counts, every check with its label and detail, Godot script errors, and the exit code, which is honoured (a non-zero exit fails the run even with no FAIL line). The harness protocol is plain: print \"PASS  <label>\" or \"FAIL  <label>  <detail>\" per check and quit with a non-zero code on failure; the starter kits ship such a harness at res://tests/smoke_test.tscn. Runs alongside an open editor and does not need the bridge; the editor is only used to learn the project path. Run it after every milestone and before any screenshot you intend to show.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "run"
+        ],
+        "description": "run: Run a test scene or script in a headless Godot and return every PASS/FAIL check plus the exit code"
+      },
+      "target": {
+        "type": "string",
+        "description": "res:// path of the test scene (.tscn) or SceneTree script (.gd) to run, e.g. res://tests/smoke_test.tscn"
+      },
+      "project_path": {
+        "description": "Godot project folder. Defaults to the project of the connected editor.",
+        "type": "string"
+      },
+      "args": {
+        "description": "User arguments passed to the test after `--`, e.g. [\"--test-save\"] to make a harness use a throwaway save file.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "timeout_ms": {
+        "description": "Kill the run after this long (default 180s, max 600s).",
+        "type": "integer",
+        "exclusiveMinimum": 0,
+        "maximum": 600000
+      },
+      "godot": {
+        "description": "Godot 4 executable to use. Defaults to GODOT_BIN, PATH, then the usual install folders.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "action",
+      "target"
+    ]
+  },
+  "annotations": {
+    "title": "Run Tests",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+  }
+}
