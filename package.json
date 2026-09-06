@@ -7,6 +7,6 @@
     "godot-connector": "./server/dist/cli.js"
   },
   "scripts": {
-    "prepare": "npm --prefix server install && npm --prefix server run build"
+    "prepare": "node scripts/prepare.mjs"
   }
 }
