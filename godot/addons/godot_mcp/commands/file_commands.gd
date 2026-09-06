@@ -14,7 +14,7 @@ class_name MCPFileCommands
 # Skipped the same way projects.ts's SKIP_DIRS does (build output, VCS,
 # import cache), plus our own addon's folder specifically — user-added addons
 # should still show up, this one is the connector itself, not game content.
-const SKIP_DIR_NAMES := [".godot", "build", "node_modules", ".git"]
+const SKIP_DIR_NAMES := [".godot", "build", "node_modules", ".git", ".builder"]
 const SKIP_PATHS := ["res://addons/godot_mcp"]
 
 
