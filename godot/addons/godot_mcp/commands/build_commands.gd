@@ -106,6 +106,7 @@ func get_commands() -> Dictionary:
 	return {
 		"run_check": run_check,
 		"run_tests": run_tests,
+		"run_game_headless": run_game_headless,
 		"run_export_web": run_export_web,
 		"run_export_desktop": run_export_desktop,
 	}
@@ -161,6 +162,21 @@ func _run_process(args: PackedStringArray) -> Dictionary:
 
 func _project_dir() -> String:
 	return ProjectSettings.globalize_path("res://")
+
+
+# Runs the project's real main scene headless for a fixed number of frames —
+# mirrors bridge/src/godot.ts's runGame(). Catches the main scene crashing on
+# frame two in a way a smoke test that only exercises what the agent thought
+# to test never would. Named _headless to stay clearly distinct from
+# editor.ts's run_project/stop_project, which run the game live inside this
+# same open editor for interactive playtesting — a different feature already
+# built before this file existed, not something this replaces.
+func run_game_headless(params: Dictionary) -> Dictionary:
+	var frames: int = int(params.get("frames", 120))
+	var project_dir := _project_dir()
+	var imported := await _run_process(PackedStringArray(["--headless", "--path", project_dir, "--import"]))
+	var run := await _run_process(PackedStringArray(["--headless", "--path", project_dir, "--quit-after", str(frames)]))
+	return _success({"import": imported, "run": run})
 
 
 # Import the project (builds the class cache), then load every script with
