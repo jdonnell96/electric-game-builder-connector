@@ -8,8 +8,49 @@ func get_commands() -> Dictionary:
 		"get_scene_tree": get_scene_tree,
 		"open_scene": open_scene,
 		"save_scene": save_scene,
-		"reload_scene": reload_scene
+		"reload_scene": reload_scene,
+		"create_scene": create_scene,
 	}
+
+
+# Builds a brand-new scene file with a single root node, written directly to
+# disk — the counterpart to open_scene/save_scene for content that does not
+# exist yet. Not tied to any currently-open scene; open_scene the result
+# afterward to add children with MCPNodeCommands.add_node.
+func create_scene(params: Dictionary) -> Dictionary:
+	var path: String = params.get("path", "")
+	var root_type: String = params.get("root_type", "Node")
+
+	if path.is_empty():
+		return _error("INVALID_PARAMS", "path is required")
+	if not path.begins_with("res://") or not path.ends_with(".tscn"):
+		return _error("INVALID_PARAMS", "path must be a res://....tscn path")
+	if not ClassDB.class_exists(root_type) or not ClassDB.can_instantiate(root_type):
+		return _error("INVALID_PARAMS", "Cannot instantiate node type: %s" % root_type)
+
+	var root: Node = ClassDB.instantiate(root_type)
+	if root == null:
+		return _error("CREATE_FAILED", "Failed to instantiate root node of type %s" % root_type)
+	root.name = path.get_file().get_basename()
+
+	var dir_path := path.get_base_dir()
+	if not dir_path.is_empty() and not DirAccess.dir_exists_absolute(dir_path):
+		var mkerr := DirAccess.make_dir_recursive_absolute(dir_path)
+		if mkerr != OK:
+			root.free()
+			return _error("MKDIR_FAILED", "Could not create %s: %s" % [dir_path, error_string(mkerr)])
+
+	var packed := PackedScene.new()
+	var pack_err := packed.pack(root)
+	root.free()
+	if pack_err != OK:
+		return _error("PACK_FAILED", "Failed to pack scene: %s" % error_string(pack_err))
+
+	var save_err := ResourceSaver.save(packed, path)
+	if save_err != OK:
+		return _error("SAVE_FAILED", "Failed to save scene: %s" % error_string(save_err))
+
+	return _success({"path": path, "root_type": root_type})
 
 
 func get_scene_tree(params: Dictionary) -> Dictionary:

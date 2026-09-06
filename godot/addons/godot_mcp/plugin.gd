@@ -13,6 +13,16 @@ const SETTING_BIND_MODE := "godot_mcp/bind_mode"
 const SETTING_CUSTOM_BIND_IP := "godot_mcp/custom_bind_ip"
 const SETTING_PORT_OVERRIDE_ENABLED := "godot_mcp/port_override_enabled"
 const SETTING_PORT_OVERRIDE := "godot_mcp/port_override"
+# Bearer token a caller must present (as the first message's params.token) before
+# the WebSocket server will dispatch anything else — see websocket_server.gd. A
+# same-machine stdio MCP client (this editor's usual Claude Code / Cursor setup)
+# never goes through the WebSocket at all, so this only gates network callers:
+# today that's still just localhost, but the whole reason it exists is that a
+# browser page will be a legitimate caller soon, and any other tab on the same
+# machine could otherwise open the same socket. Generated once and persisted in
+# project.godot like every other setting here; never sent back over the socket
+# itself (see get_pairing_token() callers — only the local status panel shows it).
+const SETTING_PAIRING_TOKEN := "godot_mcp/pairing_token"
 
 var _websocket_server: WebSocketServer
 var _command_router: CommandRouter
@@ -51,6 +61,7 @@ func _enter_tree() -> void:
 	_setup_version_display()
 	_apply_bind_settings(true)
 	MCPLog.info("Plugin initialized")
+	MCPLog.info("Pairing token (paste into a hosted app once to connect it): %s" % get_pairing_token())
 
 
 func _exit_tree() -> void:
@@ -85,7 +96,27 @@ func _ensure_bind_settings() -> void:
 		ProjectSettings.set_setting(SETTING_PORT_OVERRIDE_ENABLED, false)
 	if not ProjectSettings.has_setting(SETTING_PORT_OVERRIDE):
 		ProjectSettings.set_setting(SETTING_PORT_OVERRIDE, WebSocketServer.DEFAULT_PORT)
+	if not ProjectSettings.has_setting(SETTING_PAIRING_TOKEN) or str(ProjectSettings.get_setting(SETTING_PAIRING_TOKEN, "")).is_empty():
+		ProjectSettings.set_setting(SETTING_PAIRING_TOKEN, _generate_pairing_token())
 	ProjectSettings.save()
+
+
+func _generate_pairing_token() -> String:
+	var crypto := Crypto.new()
+	return crypto.generate_random_bytes(24).hex_encode()
+
+
+func get_pairing_token() -> String:
+	return str(ProjectSettings.get_setting(SETTING_PAIRING_TOKEN, ""))
+
+
+func regenerate_pairing_token() -> String:
+	var token := _generate_pairing_token()
+	ProjectSettings.set_setting(SETTING_PAIRING_TOKEN, token)
+	ProjectSettings.save()
+	if _websocket_server:
+		_websocket_server.set_pairing_token(token)
+	return token
 
 
 func _setup_bind_ui() -> void:
@@ -220,6 +251,7 @@ func _do_restart_server() -> void:
 	_current_bind_mode = _get_bind_mode()
 	var mode_name := MCPEnums.get_mode_name(_current_bind_mode)
 
+	_websocket_server.set_pairing_token(get_pairing_token())
 	var err := _websocket_server.start_server(port, bind)
 	if err != OK:
 		_update_status("Failed to bind %s:%d (%s)" % [bind, port, error_string(err)])

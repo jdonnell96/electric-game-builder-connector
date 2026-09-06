@@ -21,6 +21,7 @@ const PONG_TIMEOUT_MS = 10000;
 const CLOSE_CODE_ALREADY_CONNECTED = 4001;
 const CLOSE_CODE_STALE = 4002;
 const CLOSE_CODE_REPLACED = 4003;
+const CLOSE_CODE_UNAUTHORIZED = 4004;
 
 export type DisconnectReason =
   | 'never_connected'
@@ -29,6 +30,7 @@ export type DisconnectReason =
   | 'connection_refused'
   | 'connection_lost'
   | 'closed_normally'
+  | 'unauthorized'
   | 'error';
 
 export interface ConnectionDiagnostics {
@@ -61,6 +63,17 @@ export interface GodotConnectionOptions {
   host?: string;
   port?: number;
   autoReconnect?: boolean;
+  /**
+   * Pairing token the addon's WebSocket server requires as the very first
+   * message before dispatching anything else (see websocket_server.gd). An
+   * addon running without the auth patch simply returns UNKNOWN_COMMAND for
+   * "authenticate" and keeps the connection open, so sending this is safe
+   * against both old and new addon versions. Undefined/empty still gets sent
+   * (as an empty token) so a patched addon's rejection surfaces immediately
+   * as a clear "unauthorized" diagnostic instead of every later command
+   * timing out with no explanation.
+   */
+  authToken?: string;
 }
 
 export class GodotConnection extends EventEmitter {
@@ -82,12 +95,14 @@ export class GodotConnection extends EventEmitter {
   private readonly host: string;
   private readonly _port: number;
   private readonly autoReconnect: boolean;
+  private readonly authToken: string;
 
   constructor(options: GodotConnectionOptions = {}) {
     super();
     this.host = options.host ?? DEFAULT_HOST;
     this._port = options.port ?? DEFAULT_PORT;
     this.autoReconnect = options.autoReconnect ?? true;
+    this.authToken = options.authToken ?? '';
   }
 
   get isConnected(): boolean {
@@ -188,6 +203,12 @@ export class GodotConnection extends EventEmitter {
         }
         break;
 
+      case 'unauthorized':
+        lines.push('Status: Godot rejected the pairing token');
+        lines.push('Suggestion: Set GODOT_MCP_TOKEN to the token the Godot editor printed to its output on startup');
+        lines.push('  (or shown in the MCP panel), then restart this server.');
+        break;
+
       case 'error':
         lines.push('Status: Connection error');
         if (diag.lastErrorMessage) {
@@ -210,11 +231,27 @@ export class GodotConnection extends EventEmitter {
     return new Promise((resolve, reject) => {
       this.isClosing = false;
       this.currentState = this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting';
+      // Guards against resolving/rejecting this Promise twice — e.g. an
+      // unauthorized close firing after 'open' has already settled it.
+      let settled = false;
       this.ws = new WebSocket(this.url);
 
       this.ws.on('open', async () => {
         this.reconnectAttempt = 0;
         this.startPingInterval();
+
+        try {
+          // Must be the very first message sent — a patched addon holds every
+          // other command until this succeeds (see websocket_server.gd) and
+          // closes the connection outright on a bad/missing token, so this
+          // has to precede performHandshake(), not follow it.
+          await this.performAuthentication();
+        } catch (error) {
+          // The 'close' handler below is what actually settles this Promise
+          // and reports the failure for an auth rejection — there is no live
+          // socket left here to hand off to a handshake.
+          return;
+        }
 
         try {
           await this.performHandshake();
@@ -228,6 +265,7 @@ export class GodotConnection extends EventEmitter {
         // version metadata but isn't required for operation (backwards compatibility)
         this.currentState = 'connected';
 
+        settled = true;
         this.emit('connected');
         resolve();
       });
@@ -280,6 +318,11 @@ export class GodotConnection extends EventEmitter {
           logger.warning('Godot closed stale connection, will reconnect', {
             reason: reasonStr,
           });
+        } else if (code === CLOSE_CODE_UNAUTHORIZED) {
+          this.lastDisconnectReason = 'unauthorized';
+          logger.error('Godot rejected the pairing token', {
+            suggestion: 'Set GODOT_MCP_TOKEN to the token shown in the Godot editor output on startup.',
+          });
         } else if (wasConnected) {
           this.lastDisconnectReason = 'connection_lost';
         } else if (this.lastDisconnectReason === 'never_connected') {
@@ -291,6 +334,15 @@ export class GodotConnection extends EventEmitter {
         if (this.autoReconnect && !this.isClosing) {
           this.scheduleReconnect();
         }
+
+        // The initial connect() call is still awaiting 'open'/'connected' —
+        // without this, an auth rejection on the very first attempt (closed
+        // before performHandshake() ever runs) would leave that caller's
+        // await hanging forever, since only 'error' rejects it otherwise.
+        if (!settled) {
+          settled = true;
+          reject(new GodotConnectionError(`Connection closed before completing: ${this.getDiagnosticMessage()}`));
+        }
       });
 
       this.ws.on('error', (error) => {
@@ -301,7 +353,8 @@ export class GodotConnection extends EventEmitter {
           this.lastDisconnectReason = 'error';
         }
         this.emit('error', error);
-        if (!this.isConnected) {
+        if (!settled) {
+          settled = true;
           reject(new GodotConnectionError(`Failed to connect: ${error.message}`));
         }
       });
@@ -343,6 +396,33 @@ export class GodotConnection extends EventEmitter {
 
       this.pendingRequests.set(request.id, {
         resolve: resolve as (result: unknown) => void,
+        reject,
+        timeoutId,
+      });
+
+      this.ws!.send(JSON.stringify(request));
+    });
+  }
+
+  // Sent as literally the first message on every connection, per
+  // websocket_server.gd's _handle_packet gate. An addon predating the auth
+  // patch just returns UNKNOWN_COMMAND for "authenticate" (unrecognized
+  // command name, dispatched to command_router like any other) and leaves
+  // the connection open — so this resolves normally against an old addon
+  // too, and only a patched addon's actual accept/reject response (or its
+  // close-the-socket rejection, surfaced via the 'close' handler instead of
+  // this call ever resolving) means anything.
+  private async performAuthentication(): Promise<void> {
+    const request = createRequest('authenticate', { token: this.authToken });
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.pendingRequests.delete(request.id);
+        reject(new GodotTimeoutError('authenticate', HANDSHAKE_TIMEOUT_MS));
+      }, HANDSHAKE_TIMEOUT_MS);
+
+      this.pendingRequests.set(request.id, {
+        resolve: () => resolve(),
         reject,
         timeoutId,
       });
@@ -546,6 +626,7 @@ export function getGodotConnection(): GodotConnection {
     globalConnection = new GodotConnection({
       host,
       port,
+      authToken: process.env.GODOT_MCP_TOKEN,
     });
   }
   return globalConnection;

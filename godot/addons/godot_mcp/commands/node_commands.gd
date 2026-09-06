@@ -13,7 +13,9 @@ func get_commands() -> Dictionary:
 		"get_node_properties": get_node_properties,
 		"find_nodes": find_nodes,
 		"update_node": update_node,
-		"reparent_node": reparent_node
+		"reparent_node": reparent_node,
+		"add_node": add_node,
+		"remove_node": remove_node,
 	}
 
 
@@ -169,5 +171,76 @@ func reparent_node(params: Dictionary) -> Dictionary:
 	node.reparent(new_parent)
 
 	return _success({"new_path": str(root.get_path_to(node))})
+
+
+# The other real gap alongside file I/O: nothing here could previously create a
+# node that doesn't already exist, only mutate/reparent/inspect one. Requires a
+# scene already open in the editor (create_scene + open_scene for brand-new
+# content); saving is a separate save_scene call, same as every other mutation
+# in this file.
+func add_node(params: Dictionary) -> Dictionary:
+	var scene_check := _require_scene_open()
+	if not scene_check.is_empty():
+		return scene_check
+
+	var parent_path: String = params.get("parent_path", "")
+	var node_type: String = params.get("node_type", "")
+	var node_name: String = params.get("node_name", "")
+	var properties: Dictionary = params.get("properties", {})
+
+	if node_type.is_empty():
+		return _error("INVALID_PARAMS", "node_type is required")
+	if node_name.is_empty():
+		return _error("INVALID_PARAMS", "node_name is required")
+	if not ClassDB.class_exists(node_type) or not ClassDB.can_instantiate(node_type):
+		return _error("INVALID_PARAMS", "Cannot instantiate node type: %s" % node_type)
+
+	var root := EditorInterface.get_edited_scene_root()
+	var parent: Node = root
+	if not parent_path.is_empty():
+		parent = _get_node(parent_path)
+		if not parent:
+			return _error("NODE_NOT_FOUND", "Parent not found: %s" % parent_path)
+
+	var node: Node = ClassDB.instantiate(node_type)
+	if node == null:
+		return _error("CREATE_FAILED", "Failed to instantiate node of type %s" % node_type)
+	node.name = node_name
+
+	parent.add_child(node)
+	# Without an owner, the node is transient scaffolding as far as scene
+	# packing is concerned — save_scene's packed_scene.pack(root) would silently
+	# drop it. This is the one step with no equivalent in update_node/reparent_node,
+	# since those only ever touch nodes that were already part of a saved scene.
+	node.owner = root
+
+	for key in properties:
+		if key in node:
+			node.set(key, MCPUtils.deserialize_value(properties[key]))
+
+	return _success({"path": str(root.get_path_to(node))})
+
+
+func remove_node(params: Dictionary) -> Dictionary:
+	var scene_check := _require_scene_open()
+	if not scene_check.is_empty():
+		return scene_check
+
+	var node_path: String = params.get("node_path", "")
+	if node_path.is_empty():
+		return _error("INVALID_PARAMS", "node_path is required")
+
+	var node := _get_node(node_path)
+	if not node:
+		return _error("NODE_NOT_FOUND", "Node not found: %s" % node_path)
+
+	var root := EditorInterface.get_edited_scene_root()
+	if node == root:
+		return _error("CANNOT_REMOVE_ROOT", "Cannot remove the root node")
+
+	node.get_parent().remove_child(node)
+	node.queue_free()
+
+	return _success({})
 
 

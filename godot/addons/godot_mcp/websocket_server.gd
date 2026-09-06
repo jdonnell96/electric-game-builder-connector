@@ -16,6 +16,12 @@ const CLOSE_CODE_STALE := 4002
 const CLOSE_REASON_STALE := "Connection timed out (no activity)"
 const CLOSE_CODE_ALREADY_CONNECTED := 4001
 const CLOSE_REASON_ALREADY_CONNECTED := "Another client is already connected"
+const CLOSE_CODE_UNAUTHORIZED := 4004
+const CLOSE_REASON_UNAUTHORIZED := "Missing or invalid pairing token"
+# How long a connected-but-not-yet-authenticated peer is given to send its
+# first (authenticate) message before being dropped. Short: a legitimate
+# caller sends it immediately on open; anything else is just holding a slot.
+const AUTH_TIMEOUT_MSEC := 10000
 
 var _server: TCPServer
 var _peer: StreamPeerTCP
@@ -25,6 +31,12 @@ var _connected_host: String = ""
 var _connected_port: int = 0
 var _last_activity_msec: int = 0
 var _stale_reason: String = ""
+# Empty means "no token configured" — refuses every connection outright rather
+# than silently running open, since a caller that never set a token is a bug,
+# not an intentionally-unsecured setup (see set_pairing_token()).
+var _pairing_token: String = ""
+var _authenticated := false
+var _auth_deadline_msec: int = 0
 # Newcomers that arrived while a live client already held the bridge. Each entry
 # is { "ws": WebSocketPeer, "tcp": StreamPeerTCP, "since_msec": int, "close_sent": bool }.
 # They are handshaked just far enough to receive a clean 4001 close, then dropped.
@@ -44,6 +56,10 @@ func _process(_delta: float) -> void:
 
 	if not _rejecting_peers.is_empty():
 		_process_rejecting_peers()
+
+
+func set_pairing_token(token: String) -> void:
+	_pairing_token = token
 
 
 func start_server(port: int = DEFAULT_PORT, bind_address: String = "127.0.0.1") -> Error:
@@ -83,6 +99,7 @@ func stop_server() -> void:
 	_connected_host = ""
 	_connected_port = 0
 	_last_activity_msec = 0
+	_authenticated = false
 
 
 func get_connected_host() -> String:
@@ -136,6 +153,8 @@ func _accept_connection() -> void:
 	_connected_host = _peer.get_connected_host()
 	_connected_port = _peer.get_connected_port()
 	_last_activity_msec = Time.get_ticks_msec()
+	_authenticated = false
+	_auth_deadline_msec = Time.get_ticks_msec() + AUTH_TIMEOUT_MSEC
 
 	MCPLog.info("TCP connection received from %s:%d, awaiting WebSocket handshake..." % [_connected_host, _connected_port])
 
@@ -220,6 +239,11 @@ func _process_websocket() -> void:
 				_ws_peer.close(CLOSE_CODE_STALE, CLOSE_REASON_STALE)
 				return
 
+			if not _authenticated and Time.get_ticks_msec() > _auth_deadline_msec:
+				MCPLog.warn("Closing connection: no valid pairing token within %ds of connecting" % (AUTH_TIMEOUT_MSEC / 1000))
+				_ws_peer.close(CLOSE_CODE_UNAUTHORIZED, CLOSE_REASON_UNAUTHORIZED)
+				return
+
 			while _ws_peer.get_available_packet_count() > 0:
 				_last_activity_msec = Time.get_ticks_msec()
 				var packet := _ws_peer.get_packet()
@@ -249,6 +273,7 @@ func _force_close_connection(close_code: int = CLOSE_CODE_STALE, close_reason: S
 	_last_activity_msec = 0
 	_connected_host = ""
 	_connected_port = 0
+	_authenticated = false
 
 
 func _is_stale_connection() -> bool:
@@ -287,6 +312,26 @@ func _handle_packet(packet: PackedByteArray) -> void:
 	var id: String = str(data.get("id"))
 	var command: String = data.get("command")
 	var params: Dictionary = data.get("params", {})
+
+	if not _authenticated:
+		if command != "authenticate":
+			MCPLog.warn("Rejecting command '%s' before authentication" % command)
+			_ws_peer.close(CLOSE_CODE_UNAUTHORIZED, CLOSE_REASON_UNAUTHORIZED)
+			return
+		var supplied: String = str(params.get("token", ""))
+		# Refuse outright if no token was ever configured — an addon that hasn't
+		# generated one yet (shouldn't happen post-_ensure_bind_settings, but a
+		# blank token must never be treated as "auth disabled") never authenticates.
+		if _pairing_token.is_empty() or supplied.is_empty() or supplied != _pairing_token:
+			MCPLog.warn("Rejecting connection: invalid pairing token")
+			# No JSON error body: the close code/reason (4003) is the whole signal,
+			# same pattern as the "already connected" rejection above — sending a
+			# response first would race the close frame with no guaranteed order.
+			_ws_peer.close(CLOSE_CODE_UNAUTHORIZED, CLOSE_REASON_UNAUTHORIZED)
+			return
+		_authenticated = true
+		send_response({"id": id, "status": "success", "result": {"authenticated": true}})
+		return
 
 	command_received.emit(id, command, params)
 
