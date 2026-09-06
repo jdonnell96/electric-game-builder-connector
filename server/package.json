@@ -1,5 +1,5 @@
 {
-  "name": "@satelliteoflove/godot-mcp",
+  "name": "@electric-game-builder/godot-connector",
   "version": "4.1.11",
   "description": "MCP server that gives AI assistants eyes and hands in the Godot editor: scene editing, input injection, deterministic game-time control, and live runtime state for agent-driven playtesting",
   "type": "module",
@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/satelliteoflove/godot-mcp.git"
+    "url": "git+https://github.com/jdonnell96/electric-game-builder-connector.git"
   },
   "bugs": {
-    "url": "https://github.com/satelliteoflove/godot-mcp/issues"
+    "url": "https://github.com/jdonnell96/electric-game-builder-connector/issues"
   },
-  "homepage": "https://github.com/satelliteoflove/godot-mcp#readme",
+  "homepage": "https://github.com/jdonnell96/electric-game-builder-connector#readme",
   "scripts": {
     "build": "tsc && npm run build-info && npm run copy-addon",
     "build-info": "tsx scripts/build-info.ts",
