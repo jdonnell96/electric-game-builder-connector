@@ -1,9 +1,13 @@
 # Dependencies
 node_modules/
 
-# Build output
-server/dist/
-server/addon/
+# Build output — server/dist/ and server/addon/ are deliberately TRACKED,
+# not ignored: this repo is installed directly via `npm install github:...`
+# (no npm-registry publish step runs `prepare` reliably in that flow — see
+# the commit that added this comment for what went wrong when they were
+# gitignored), so the built output has to already be in the repo for a
+# fresh install to work at all. Rebuild and commit before pushing:
+#   npm --prefix server run build
 server/src/*.js
 
 # IDE

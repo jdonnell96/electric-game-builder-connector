@@ -2,11 +2,13 @@
   "name": "electric-game-builder-connector",
   "private": true,
   "version": "1.0.0",
-  "description": "Install trampoline for the real package in server/ — lets `npx github:jdonnell96/electric-game-builder-connector` work from the repo root, since npm's git-dependency install looks for package.json there, not in a subdirectory.",
+  "description": "Install trampoline for the real package in server/ — lets `npm install github:jdonnell96/electric-game-builder-connector` work from the repo root, since npm's git-dependency resolution looks for package.json there, not in a subdirectory. server/dist and server/addon are committed (not built at install time — a git-dependency install does not run this reliably enough to depend on, see git history) so a fresh install has everything it needs immediately. These dependencies are a duplicate of server/package.json's own runtime (not dev) dependencies, declared here too so a plain `npm install` of this package actually pulls them into the consumer's node_modules — server/ is a plain subdirectory, not an npm workspace member, so its own package.json dependencies are otherwise invisible to npm's resolution of this one.",
   "bin": {
     "godot-connector": "./server/dist/cli.js"
   },
-  "scripts": {
-    "prepare": "node scripts/prepare.mjs"
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.18.0",
+    "zod": "^4.3.6"
   }
 }
