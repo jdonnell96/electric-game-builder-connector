@@ -38,6 +38,9 @@ godot/.editorconfig
 # path with a load warning). See Godot VCS docs / 4.4 release notes.
 *.uid
 !godot/addons/godot_mcp/**/*.uid
+# ...and the built copy of that same addon under server/addon/ (see the
+# "Build output" comment above) - same reasoning, same requirement.
+!server/addon/**/*.uid
 
 # Environment
 .env
