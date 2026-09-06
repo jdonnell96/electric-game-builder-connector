@@ -59,6 +59,7 @@ func _enter_tree() -> void:
 	_ensure_bind_settings()
 	_setup_bind_ui()
 	_setup_version_display()
+	_setup_token_display()
 	_apply_bind_settings(true)
 	MCPLog.info("Plugin initialized")
 	MCPLog.info("Pairing token (paste into a hosted app once to connect it): %s" % get_pairing_token())
@@ -116,7 +117,26 @@ func regenerate_pairing_token() -> String:
 	ProjectSettings.save()
 	if _websocket_server:
 		_websocket_server.set_pairing_token(token)
+	if _status_panel and _status_panel.has_method("set_pairing_token"):
+		_status_panel.set_pairing_token(token)
 	return token
+
+
+func _setup_token_display() -> void:
+	if not _status_panel:
+		return
+	if _status_panel.has_method("set_pairing_token"):
+		_status_panel.set_pairing_token(get_pairing_token())
+	if _status_panel.has_signal("regenerate_token_requested") and not _status_panel.regenerate_token_requested.is_connected(_on_regenerate_token_requested):
+		_status_panel.regenerate_token_requested.connect(_on_regenerate_token_requested)
+
+
+# No confirmation dialog: the button lives inside the bottom MCP panel, not
+# somewhere a stray click passes through, and regenerating just means any
+# already-paired hosted app needs the new token pasted in — not destructive.
+func _on_regenerate_token_requested() -> void:
+	regenerate_pairing_token()
+	MCPLog.info("Pairing token regenerated")
 
 
 func _setup_bind_ui() -> void:

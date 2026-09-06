@@ -2,6 +2,7 @@
 extends Control
 
 signal config_applied(config: Dictionary)
+signal regenerate_token_requested()
 
 
 func _get_minimum_size() -> Vector2:
@@ -17,8 +18,13 @@ func _get_minimum_size() -> Vector2:
 @onready var port_override_enabled: CheckBox = $MarginContainer/VBoxContainer/SettingsGrid/PortOverrideControls/PortOverrideEnabled
 @onready var port_override_spin: SpinBox = $MarginContainer/VBoxContainer/SettingsGrid/PortOverrideControls/PortOverrideSpin
 @onready var apply_button: Button = $MarginContainer/VBoxContainer/SettingsGrid/PortOverrideControls/ApplyButton
+@onready var token_edit: LineEdit = $MarginContainer/VBoxContainer/TokenRow/TokenEdit
+@onready var token_reveal_button: Button = $MarginContainer/VBoxContainer/TokenRow/TokenRevealButton
+@onready var token_copy_button: Button = $MarginContainer/VBoxContainer/TokenRow/TokenCopyButton
+@onready var token_regenerate_button: Button = $MarginContainer/VBoxContainer/TokenRow/TokenRegenerateButton
 
 var _addon_version: String = ""
+var _pairing_token: String = ""
 
 var _updating_ui := false
 
@@ -41,6 +47,13 @@ func _ready() -> void:
 		port_override_enabled.toggled.connect(_on_port_override_toggled)
 	if port_override_spin:
 		port_override_spin.value = 6550
+
+	if token_reveal_button:
+		token_reveal_button.toggled.connect(_on_token_reveal_toggled)
+	if token_copy_button:
+		token_copy_button.pressed.connect(_on_token_copy_pressed)
+	if token_regenerate_button:
+		token_regenerate_button.pressed.connect(_on_token_regenerate_pressed)
 
 	# Keyboard navigation / focus
 	_for_control_focus(bind_mode_option)
@@ -190,6 +203,29 @@ func _update_controls_enabled() -> void:
 		port_override_spin.modulate.a = 1.0 if port_enabled else 0.5
 	if port_override_label:
 		port_override_label.modulate.a = 1.0 if port_enabled else 0.5
+
+
+func set_pairing_token(token: String) -> void:
+	_pairing_token = token
+	if token_edit:
+		token_edit.text = token
+
+
+func _on_token_reveal_toggled(pressed: bool) -> void:
+	if token_edit:
+		token_edit.secret = not pressed
+	if token_reveal_button:
+		token_reveal_button.text = "Hide" if pressed else "Show"
+
+
+func _on_token_copy_pressed() -> void:
+	if _pairing_token.is_empty():
+		return
+	DisplayServer.clipboard_set(_pairing_token)
+
+
+func _on_token_regenerate_pressed() -> void:
+	regenerate_token_requested.emit()
 
 
 func set_addon_version(version: String) -> void:

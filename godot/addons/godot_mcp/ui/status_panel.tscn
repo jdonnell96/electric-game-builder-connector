@@ -44,6 +44,35 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = ""
 
+[node name="TokenRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TokenLabel" type="Label" parent="MarginContainer/VBoxContainer/TokenRow"]
+layout_mode = 2
+text = "Pairing token"
+
+[node name="TokenEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/TokenRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+editable = false
+secret = true
+placeholder_text = "generating…"
+
+[node name="TokenRevealButton" type="Button" parent="MarginContainer/VBoxContainer/TokenRow"]
+layout_mode = 2
+text = "Show"
+toggle_mode = true
+
+[node name="TokenCopyButton" type="Button" parent="MarginContainer/VBoxContainer/TokenRow"]
+layout_mode = 2
+text = "Copy"
+
+[node name="TokenRegenerateButton" type="Button" parent="MarginContainer/VBoxContainer/TokenRow"]
+layout_mode = 2
+text = "New token"
+
 [node name="HSeparator" type="HSeparator" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 

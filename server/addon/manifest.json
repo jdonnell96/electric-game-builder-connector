@@ -1,6 +1,6 @@
 {
   "version": "4.1.11",
-  "generated_at": "2026-09-06T04:31:19.597Z",
+  "generated_at": "2026-09-06T20:31:32.472Z",
   "files": {
     "build/check_scripts.gd": "02a0d588d27c9cb82b0a27d7cd9a025757bc2cdf",
     "command_router.gd": "dbd9ecf2ef06925ba381a64cb9d5c00f5f09f89d",
@@ -72,11 +72,11 @@
     "game_bridge/onscreen.gd": "06d20bafafe46da02db9d5d4a89b9f3bd55452fa",
     "game_bridge/onscreen.gd.uid": "23071f26a261e6e4aa6a735b14c03cb7c1475f15",
     "plugin.cfg": "446b85ccbf0f7f59d3699a58acd0b3f9edd6b3a8",
-    "plugin.gd": "62cc7a1688bdcf18b50a467236b197fbcc5b7536",
+    "plugin.gd": "84fdf7aa9d5d137436b3a918686c148ac63bcce1",
     "plugin.gd.uid": "753700ec399502adb4190d4cbcabf79577b81c00",
-    "ui/status_panel.gd": "ddbdc1218691b32dbb42882e86703ac96fd15a49",
+    "ui/status_panel.gd": "a2e0077583e11b2604c934db61e884e8f3ed109a",
     "ui/status_panel.gd.uid": "c93eb0b0e1a5f9144b614359a1d57ade99053377",
-    "ui/status_panel.tscn": "04b32a46e637d42eaa4178b34b7291bd05545090",
+    "ui/status_panel.tscn": "983365a76ff46232b652533bee90f4997bc392e1",
     "websocket_server.gd": "107765e52cc3a406026acb68e5cbb992f426d2e6",
     "websocket_server.gd.uid": "82df68bc380b6f091645081e1e3ebc70b3837958"
   }
