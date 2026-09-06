@@ -1,0 +1,12 @@
+{
+  "name": "electric-game-builder-connector",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Install trampoline for the real package in server/ — lets `npx github:jdonnell96/electric-game-builder-connector` work from the repo root, since npm's git-dependency install looks for package.json there, not in a subdirectory.",
+  "bin": {
+    "godot-connector": "./server/dist/cli.js"
+  },
+  "scripts": {
+    "prepare": "npm --prefix server install && npm --prefix server run build"
+  }
+}
