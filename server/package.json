@@ -52,16 +52,16 @@
   "author": "Christopher Childress",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "ws": "^8.18.0",
-    "zod": "^4.3.6"
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.0.0",
-    "@types/ws": "^8.5.0",
+    "@types/node": "^26.6.3",
+    "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "^4.1.8",
     "nodemon": "^3.1.11",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^4.0.16"
   },
